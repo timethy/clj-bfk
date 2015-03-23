@@ -2,12 +2,21 @@
   (:gen-class))
 
 ; If EOF is read, return 0
-(defn- bf-read-char [] (max 0 (.read System/in)))
+(defn- bf-read-char []
+  (let [c (.read System/in)]
+    (max 0 c)))
 
 (defn bf-find-bracket [prog pos dir]
-  (if (= (nth prog pos) (if (= 1 dir) \] \[))
-    pos
-    (bf-find-bracket prog (+ pos dir) dir)))
+  (loop [i (+ pos dir) open 0]
+    (if (= (get prog i) (if (= 1 dir) \] \[))
+      (if (= open 0)
+        i
+        (recur (+ i dir) (dec open)))
+      (if (= (get prog i) (if (= 1 dir) \[ \]))
+        (recur (+ i dir) (inc open))
+        (recur (+ i dir) open)))))
+
+(def bf-cmds #{\< \> \+ \- \, \. \[ \]})
 
 (defn bf-set [a j x]
   (if (< (count a) j)
@@ -21,9 +30,9 @@
     (if (= cmd \.) (-> a (get j 0) (max 0) char print))
     [(inc
        (case cmd
-         \[ (if (= v 0) (bf-find-bracket p i 1) i)
-         \] (if (not= v 0) (bf-find-bracket p i -1) i)
-         i))
+          \[ (if (=    v 0) (bf-find-bracket p i  1) i)
+          \] (if (not= v 0) (bf-find-bracket p i -1) i)
+          i))
      (case cmd
        \< [a (dec j)]
        \> [a (inc j)]
@@ -36,12 +45,12 @@
   (= (count p) i))
 
 (defn- bf-exec [prog initial-state]
-  (loop [state initial-state]
-    (when-not (bf-finished prog state)
-      (recur (bf-step prog state)))))
+  (loop [state initial-state i 0]
+    (when-not (or (bf-finished prog state) (< i -1))
+      (recur (bf-step prog state) (inc i)))))
 
 (defn bf [prog]
-  (bf-exec prog [0 [[] 0]]))
+  (bf-exec (apply str (filter bf-cmds prog)) [0 [[] 0]]))
 
 (defn bf-file [file]
   (bf (slurp file)))
